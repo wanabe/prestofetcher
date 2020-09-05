@@ -2,12 +2,23 @@ version: "3"
 services:
   local-dev:
     build:
-      context: .
+      context: ./docker/local-dev/
     tty: true
     working_dir: /local-dev
     volumes:
       - "./:/local-dev"
   presto:
-    image: prestosql/presto
+    build:
+      context: ./docker/presto/
     ports:
       - "8889:8080"
+    volumes:
+      - "./docker/presto/etc/presto/catalog/mysql.properties:/etc/presto/catalog/mysql.properties"
+  mysql:
+    image: mysql:5.7
+    ports:
+      - "3306:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: password
+    volumes:
+      - "./docker/mysql/docker-entrypoint-initdb.d:/docker-entrypoint-initdb.d"
