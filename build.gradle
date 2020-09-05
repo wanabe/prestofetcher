@@ -26,5 +26,19 @@ dependencies {
     implementation 'com.google.guava:guava:29.0-jre'
 
     // Use JUnit test framework
-    testImplementation 'junit:junit:4.13'
+    testImplementation 'org.junit.jupiter:junit-jupiter-api:5.6.2'
+    testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.6.2'
+
+    // Use OkHttp
+    implementation "com.squareup.okhttp3:okhttp:4.8.1"
+    implementation "org.json:json:20200518"
+}
+
+tasks.withType(Test) {
+    useJUnitPlatform()
+    testLogging {
+        exceptionFormat "full"
+        events "started", "skipped", "passed", "failed"
+        showStandardStreams true
+    }
 }
