@@ -1,0 +1,13 @@
+version: "3"
+services:
+  local-dev:
+    build:
+      context: .
+    tty: true
+    working_dir: /local-dev
+    volumes:
+      - "./:/local-dev"
+  presto:
+    image: prestosql/presto
+    ports:
+      - "8889:8080"
