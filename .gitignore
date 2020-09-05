@@ -3,3 +3,11 @@
 
 # Ignore Gradle build output directory
 build
+
+# Ignore ecslipse related files
+.settings/org.eclipse.*.core.prefs
+bin/**/*.class
+.classpath
+
+# Ignore vscode setting
+/.vscode/
