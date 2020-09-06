@@ -1,4 +1,4 @@
-package com.github.wanabe.presto_api_mapping;
+package com.github.wanabe.prestofetcher;
 
 import java.util.HashMap;
 

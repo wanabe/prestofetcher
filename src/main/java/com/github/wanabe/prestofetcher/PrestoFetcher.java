@@ -1,4 +1,4 @@
-package com.github.wanabe.presto_api_mapping;
+package com.github.wanabe.prestofetcher;
 
 import java.io.IOException;
 import java.util.Iterator;
@@ -10,7 +10,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
-import com.github.wanabe.presto_api_mapping.PrestoStatement.Column;
+import com.github.wanabe.prestofetcher.PrestoStatement.Column;
 
 class PrestoFetcher extends Thread {
     private final LinkedBlockingQueue<PrestoRecord> queue;
