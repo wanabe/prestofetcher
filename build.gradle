@@ -31,7 +31,7 @@ dependencies {
 
     // Use OkHttp
     implementation "com.squareup.okhttp3:okhttp:4.8.1"
-    implementation "org.json:json:20200518"
+    implementation "com.fasterxml.jackson.core:jackson-databind:2.11.2"
 }
 
 tasks.withType(Test) {

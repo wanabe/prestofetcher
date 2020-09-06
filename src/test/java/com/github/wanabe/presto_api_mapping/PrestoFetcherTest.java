@@ -6,7 +6,8 @@ import static org.junit.jupiter.api.Assertions.*;
 import java.io.IOException;
 import java.util.concurrent.TimeUnit;
 
-import org.json.JSONObject;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
 import okhttp3.MediaType;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
@@ -15,11 +16,12 @@ import okhttp3.Response;
 
 public class PrestoFetcherTest {
     @Test
-     void testPoll() {
+    void testPoll() {
         assertDoesNotThrow(() -> {
-            String nextUri = query("SELECT * FROM users");
+            final String nextUri = query("SELECT * FROM users");
 
-            PrestoFetcher fetcher = new PrestoFetcher(nextUri, 10_000, TimeUnit.MILLISECONDS);
+            final PrestoFetcher fetcher = new PrestoFetcher(nextUri, 10_000, TimeUnit.MILLISECONDS);
+
             assertEquals(new PrestoRecord() {
                 private static final long serialVersionUID = 1L;
                 {
@@ -38,7 +40,7 @@ public class PrestoFetcherTest {
         });
     }
 
-    private String query(String query) throws IOException {
+    private String query(final String query) throws IOException {
         final OkHttpClient client = new OkHttpClient();
 
         final RequestBody body = RequestBody.create(query, MediaType.get("text/plain; charset=utf-8"));
@@ -47,7 +49,9 @@ public class PrestoFetcherTest {
                 .addHeader("X-Presto-Schema", "test").post(body).build();
 
         final Response response = client.newCall(request).execute();
-        final JSONObject responseJson = new JSONObject(response.body().string());
-        return responseJson.getString("nextUri");
+        final String jsonStr = response.body().string();
+        final ObjectMapper mapper = new ObjectMapper();
+        final PrestoStatement statement = mapper.readValue(jsonStr, PrestoStatement.class);
+        return statement.getNextUri();
     }
 }

@@ -1,36 +1,34 @@
 package com.github.wanabe.presto_api_mapping;
 
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.Iterator;
+import java.util.List;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 
-import org.json.JSONArray;
-import org.json.JSONException;
-import org.json.JSONObject;
-
+import com.fasterxml.jackson.databind.ObjectMapper;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.Response;
 
+import com.github.wanabe.presto_api_mapping.PrestoStatement.Column;
+
 class PrestoFetcher extends Thread {
-    private String uri;
     private final LinkedBlockingQueue<PrestoRecord> queue;
     private final long timeout;
     private final TimeUnit unit;
-    private ArrayList<String> columns = null;
+    private final PrestoStatement statement;
 
     public PrestoFetcher(final String uri, final long timeout, final TimeUnit unit) {
-        this.uri = uri;
         this.timeout = timeout;
         this.unit = unit;
         this.queue = new LinkedBlockingQueue<>();
+        statement = new PrestoStatement(uri);
         start();
     }
 
     public boolean isClosed() {
-        return uri == null;
+        return statement.isClosed();
     }
 
     public PrestoRecord poll(final long timeout, final TimeUnit unit) throws InterruptedException {
@@ -53,79 +51,49 @@ class PrestoFetcher extends Thread {
         return poll(timeout, unit);
     }
 
-    void fetchColumns(final JSONObject responseJson) {
-        if (columns == null && responseJson.has("columns")) {
-            columns = new ArrayList<>();
-            try {
-                for (final Object _column : responseJson.getJSONArray("columns")) {
-                    final JSONObject column = (JSONObject) _column;
-                    columns.add(column.getString("name"));
-                }
-            } catch (final JSONException e) {
-                close();
-            }
-        }
-    }
-
-    void fetchData(final JSONObject responseJson) {
-        if (responseJson.has("data")) {
-            if (columns == null) {
-                return;
-            }
-            try {
-                for (final Object line : responseJson.getJSONArray("data")) {
-                    final Iterator<String> columnIterator = columns.iterator();
-                    final PrestoRecord record = new PrestoRecord();
-                    for (final Object o : (JSONArray) line) {
-                        record.put(columnIterator.next(), o);
-                    }
-                    queue.add(record);
-                }
-            } catch (final ClassCastException | JSONException e) {
-                close();
-            }
-        }
-    }
-
-    void fetchNextUri(final JSONObject responseJson) {
-        if (responseJson.has("nextUri")) {
-            try {
-                uri = responseJson.getString("nextUri");
-                return;
-            } catch(final JSONException e) {
-                // through to close
-            }
-        }
-        close();
-    }
-
     void close() {
         queue.add(new PrestoRecord(true));
-        uri = null;
+        statement.close();
     }
 
     @Override
     public void run() {
         final OkHttpClient client = new OkHttpClient();
 
-        Request request;
-        Response response;
-        JSONObject responseJson;
-
-        while (uri != null) {
-            request = new Request.Builder().url(uri).addHeader("X-Presto-User", "presto")
-                    .addHeader("X-Presto-Catalog", "mysql").addHeader("X-Presto-Schema", "test").get().build();
+        while (!isClosed()) {
+            final Request request = new Request.Builder().url(statement.getNextUri())
+                    .addHeader("X-Presto-User", "presto").addHeader("X-Presto-Catalog", "mysql")
+                    .addHeader("X-Presto-Schema", "test").get().build();
             try {
-                response = client.newCall(request).execute();
-                responseJson = new JSONObject(response.body().string());
-            } catch(final IOException|JSONException e) {
+                final ObjectMapper mapper = new ObjectMapper();
+                final Response response = client.newCall(request).execute();
+                final String responseBody = response.body().string();
+                statement.clear();
+                mapper.readerForUpdating(statement).readValue(responseBody);
+            } catch (final IOException e) {
                 close();
                 return;
             }
+            processStatement();
+        }
+    }
 
-            fetchColumns(responseJson);
-            fetchData(responseJson);
-            fetchNextUri(responseJson);
+    private void processStatement() {
+        if (statement == null) {
+            return;
+        }
+        if (statement.getData() != null) {
+            for (final List<Object> values : statement.getData()) {
+                final PrestoRecord record = new PrestoRecord();
+                final Iterator<Object> valueIterator = values.iterator();
+                for (final Column column : statement.getColumns()) {
+                    record.put(column.getName(), valueIterator.next());
+                }
+                queue.add(record);
+            }
+        }
+        if (statement.getNextUri() == null) {
+            close();
         }
     }
 }
