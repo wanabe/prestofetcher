@@ -9,11 +9,12 @@ public class PrestoFetcherTest {
     @Test
     void testPoll() {
         assertDoesNotThrow(() -> {
-            final PrestoFetcher preFetcher = new PrestoFetcher();
-            final String nextUri = preFetcher.query("http://presto:8080", "SELECT * FROM users");
+            final PrestoSession session = new PrestoSession("presto", "mysql", "test", "http://presto:8080");
 
-            final PrestoFetcher fetcher = new PrestoFetcher(nextUri, 10_000, TimeUnit.MILLISECONDS);
-            fetcher.start();
+            final PrestoFetcher preFetcher = new PrestoFetcher(session);
+            final String nextUri = preFetcher.query("SELECT * FROM users");
+
+            final PrestoFetcher fetcher = new PrestoFetcher(session, nextUri, 10_000, TimeUnit.MILLISECONDS);
 
             assertEquals(new PrestoRecord() {
                 private static final long serialVersionUID = 1L;
