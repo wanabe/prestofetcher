@@ -1,23 +1,18 @@
 package com.github.wanabe.prestofetcher;
 
 import java.io.IOException;
-import java.util.Iterator;
-import java.util.List;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
-import com.github.wanabe.prestofetcher.PrestoStatement.Column;
-
-class PrestoFetcher extends Thread {
-    private final LinkedBlockingQueue<PrestoRecord> queue;
-    private final long timeout;
-    private final TimeUnit unit;
+abstract class PrestoFetcher<T> extends Thread {
+    protected final LinkedBlockingQueue<PrestoQueueItem<T>> queue;
+    protected final long timeout;
+    protected final TimeUnit unit;
     private final PrestoSession session;
-    private final PrestoStatement statement;
+    protected final PrestoStatement statement;
 
     public PrestoFetcher(final PrestoSession session) {
         this(session, null, 0L, null);
@@ -36,23 +31,23 @@ class PrestoFetcher extends Thread {
         }
     }
 
-    public PrestoRecord poll(final long timeout, final TimeUnit unit) throws InterruptedException {
-        PrestoRecord record = null;
+    public T poll(final long timeout, final TimeUnit unit) throws InterruptedException {
+        PrestoQueueItem<T> target = null;
         if (statement.isClosed() && queue.isEmpty()) {
             return null;
         }
         if (timeout == 0) {
-            record = queue.poll();
+            target = queue.poll();
         } else {
-            record = queue.poll(timeout, unit);
+            target = queue.poll(timeout, unit);
         }
-        if (record != null && record.isTerminator()) {
+        if (target == null) {
             return null;
         }
-        return record;
+        return target.val;
     }
 
-    public PrestoRecord poll() throws InterruptedException {
+    public T poll() throws InterruptedException {
         return poll(timeout, unit);
     }
 
@@ -60,7 +55,8 @@ class PrestoFetcher extends Thread {
     public void run() {
         while (!statement.isClosed()) {
             try {
-                fetchStatement(session.get(statement.getNextUri()));
+                final String statementJsonString = session.get(statement.getNextUri());
+                fetchStatement(statementJsonString);
             } catch (final IOException e) {
                 close();
             }
@@ -73,31 +69,22 @@ class PrestoFetcher extends Thread {
             fetchStatement(statementJsonString);
         } catch (final IOException e) {
             close();
-            return null;
         }
         return statement.getNextUri();
     }
 
-    private void close() {
-        queue.add(new PrestoRecord(true));
+    protected void close() {
+        queue.add(new PrestoQueueItem<>(null));
         statement.close();
     }
 
-    private void fetchStatement(final String statementJsonString) throws JsonProcessingException, JsonMappingException {
+    protected abstract void processStatement();
+
+    protected void fetchStatement(final String statementJsonString) throws JsonProcessingException {
         final ObjectMapper mapper = new ObjectMapper();
         statement.clear();
         mapper.readerForUpdating(statement).readValue(statementJsonString);
-
-        if (statement.getData() != null) {
-            for (final List<Object> values : statement.getData()) {
-                final PrestoRecord record = new PrestoRecord();
-                final Iterator<Object> valueIterator = values.iterator();
-                for (final Column column : statement.getColumns()) {
-                    record.put(column.getName(), valueIterator.next());
-                }
-                queue.add(record);
-            }
-        }
+        processStatement();
         if (statement.getNextUri() == null) {
             close();
         }

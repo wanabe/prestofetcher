@@ -5,16 +5,16 @@ import static org.junit.jupiter.api.Assertions.*;
 
 import java.util.concurrent.TimeUnit;
 
-public class PrestoFetcherTest {
+public class PrestoRecordFetcherTest {
     @Test
     void testPoll() {
         assertDoesNotThrow(() -> {
             final PrestoSession session = new PrestoSession("presto", "mysql", "test", "http://presto:8080");
 
-            final PrestoFetcher preFetcher = new PrestoFetcher(session);
+            final PrestoRecordFetcher preFetcher = new PrestoRecordFetcher(session);
             final String nextUri = preFetcher.query("SELECT * FROM users");
 
-            final PrestoFetcher fetcher = new PrestoFetcher(session, nextUri, 10_000, TimeUnit.MILLISECONDS);
+            final PrestoRecordFetcher fetcher = new PrestoRecordFetcher(session, nextUri, 10_000, TimeUnit.MILLISECONDS);
 
             assertEquals(new PrestoRecord() {
                 private static final long serialVersionUID = 1L;
